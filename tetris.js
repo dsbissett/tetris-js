@@ -130,6 +130,11 @@ function clearLines() {
       }
     }
 
+    // Create particles for each block in the cleared row
+    for (let x = 0; x < grid[y].length; x++) {
+      createParticles(x + 0.5, y + 0.5, colors[grid[y][x]]);
+    }
+
     const row = grid.splice(y, 1)[0].fill(0);
     grid.unshift(row);
     y++; // Check the same row index again as it now contains the row above
@@ -245,6 +250,30 @@ function playBackgroundMusic() {
   bgMusic.play();
 }
 
+function playMusicOnClick() {
+  document.addEventListener('touchstart', function onClick(){
+    bgMusic.volume = 0.5;
+    bgMusic.play().catch((error) => {
+      console.error("Error playing background music:", error);
+    });
+    document.removeEventListener('touchstart', onClick);
+  })
+  document.addEventListener('click', function onClick() {
+    bgMusic.volume = 0.5;
+    bgMusic.play().catch((error) => {
+      console.error("Error playing background music:", error);
+    });
+    document.removeEventListener('click', onClick);
+  });
+}
+
+function rotateTetrimino() {
+  const rotatedMatrix = rotateMatrix(tetrimino.matrix);
+  if (!isCollision(rotatedMatrix, tetrimino.x, tetrimino.y)) {
+    tetrimino.matrix = rotatedMatrix;
+  }
+}
+
 // Add touch controls
 canvas.addEventListener('touchstart', handleTouchStart);
 canvas.addEventListener('touchmove', handleTouchMove);
@@ -269,19 +298,20 @@ function handleTouchMove(e) {
 
   if (Math.abs(dx) > Math.abs(dy)) {
     if (dx > blockSize * 0.75) {
-      moveTetrimino(1);
+      tetrimino.move(1, 0);
       touchStartX = touchMoveX;
     } else if (dx < -blockSize * 0.75) {
-      moveTetrimino(-1);
+      tetrimino.move(-1, 0);
       touchStartX = touchMoveX;
     }
   } else {
     if (dy > blockSize * 0.75) {
-      moveDown();
+      tetrimino.move(0, 1);
       touchStartY = touchMoveY;
     }
   }
 }
+
 
 function handleTouchEnd(e) {
   e.preventDefault();
@@ -291,6 +321,59 @@ function handleTouchEnd(e) {
   if (Math.abs(dx) < blockSize * 0.25 && Math.abs(dy) < blockSize * 0.25) {
     rotateTetrimino();
   }
+}
+
+class Particle {
+  constructor(x, y, color) {
+    this.x = x;
+    this.y = y;
+    this.color = color;
+    this.size = Math.random() * 5 + 1;
+    this.speedX = Math.random() * 3 - 1.5;
+    this.speedY = Math.random() * 3 - 1.5;
+  }
+
+  update() {
+    this.x += this.speedX;
+    this.y += this.speedY;
+    if (this.size > 0.1) this.size -= 0.1;
+  }
+
+  draw() {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    ctx.fillStyle = this.color;
+    ctx.fill();
+  }
+}
+
+const particles = [];
+
+function createParticles(particleX, y, color) {
+  const numberOfParticles = 30;
+
+  for (let i = 0; i < numberOfParticles; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * 3 + 1;
+    const velocity = {
+      x: Math.cos(angle) * speed,
+      y: Math.sin(angle) * speed
+    };
+    const size = Math.random() * 3 + 1;
+    const life = 100;
+    particles.push(new Particle(particleX * blockSize, y * blockSize, velocity, size, life, color));
+  }
+}
+
+function handleParticles() {
+  particles.forEach((particle, index) => {
+    particle.update();
+    particle.draw();
+
+    if (particle.size <= 0.1) {
+      particles.splice(index, 1);
+    }
+  });
 }
 
 function gameLoop(time = 0) {
@@ -307,9 +390,12 @@ function gameLoop(time = 0) {
   drawMatrix(grid, 0, 0);
   drawMatrix(tetrimino.matrix, tetrimino.x, tetrimino.y);
   drawScore();
-  
+
+  // Handle particles
+  handleParticles();
+
   // Play background music
-  playBackgroundMusic();
+  playMusicOnClick();
 
   // Request the next frame
   requestAnimationFrame(gameLoop);
